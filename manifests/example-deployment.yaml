@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-sample
+  name: nginx-meiot
   labels:
-    app: nginx-sample
+    app: nginx-meiot
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx-sample
+      app: nginx-meiot
   template:
     metadata:
       labels:
-        app: nginx-sample
+        app: nginx-meiot
     spec:
       containers:
         - name: nginx

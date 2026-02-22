@@ -1,5 +1,5 @@
 apiVersion: v2
-name: sample-chart
-description: A small example chart for microservices and testing
+name: meiot-chart
+description: A small meiot chart for microservices and testing
 type: application
 version: 0.1.0

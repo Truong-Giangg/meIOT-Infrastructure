@@ -20,7 +20,7 @@ Tools used: Terraform, Ansible, Helm, kubectl, Rancher (optional), ArgoCD (futur
 - Automated Proxmox VE installation & configuration
 - RKE cluster deployment on Proxmox VMs
 - Local storage (Ceph / ZFS / local), networking, load balancing
-- Sample microservices deployment via Helm
+- meiot microservices deployment via Helm
 
 ### Cloud
 - AWS EKS cluster with best-practice VPC, subnets, node groups
@@ -48,7 +48,7 @@ Tools used: Terraform, Ansible, Helm, kubectl, Rancher (optional), ArgoCD (futur
 │   ├── on-prem/            # Proxmox + RKE infrastructure
 │   └── cloud/              # AWS EKS + supporting resources
 ├── helm/                   # Helm charts for microservices & observability
-├── manifests/              # Raw Kubernetes YAML (fallback / examples)
+├── manifests/              # Raw Kubernetes YAML (fallback / meiots)
 ├── docs/                   # Architecture diagrams, decision logs
 ├── scripts/                # Utility scripts (kubeconfig merge, context switch…)
 └── README.md
