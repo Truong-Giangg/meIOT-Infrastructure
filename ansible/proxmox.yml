@@ -1,0 +1,8 @@
+---
+- name: Configure Proxmox VE hosts
+  hosts: proxmox
+  become: true
+  tasks:
+    - name: Proxmox placeholder task
+      debug:
+        msg: "Proxmox playbook placeholder - add tasks to provision VMs and networking"

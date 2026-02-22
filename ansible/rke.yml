@@ -1,0 +1,8 @@
+---
+- name: Deploy RKE cluster
+  hosts: rke_nodes
+  become: true
+  tasks:
+    - name: RKE placeholder task
+      debug:
+        msg: "RKE playbook placeholder - install Docker, rke, and apply cluster config"
