@@ -1,8 +1,201 @@
 ---
-- name: Deploy RKE cluster
+- name: Install RKE cluster prerequisites
   hosts: rke_nodes
   become: true
-  tasks:
-    - name: RKE placeholder task
+  gather_facts: true
+  vars:
+    docker_version: "latest"
+    rke_version: "v1.3.13"
+  
+  pre_tasks:
+    - name: Check OS compatibility
       debug:
-        msg: "RKE playbook placeholder - install Docker, rke, and apply cluster config"
+        msg: "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+  tasks:
+    - name: Install Docker prerequisites (Ubuntu/Debian)
+      block:
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+            cache_valid_time: 3600
+          when: ansible_os_family == "Debian"
+
+        - name: Install apt dependencies
+          apt:
+            name:
+              - ca-certificates
+              - curl
+              - gnupg
+              - lsb-release
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Add Docker GPG key
+          shell: |
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          args:
+            creates: /usr/share/keyrings/docker-archive-keyring.gpg
+          when: ansible_os_family == "Debian"
+
+        - name: Add Docker repository
+          shell: |
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+          when: ansible_os_family == "Debian"
+
+        - name: Update apt cache again
+          apt:
+            update_cache: yes
+          when: ansible_os_family == "Debian"
+
+        - name: Install Docker
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+          when: ansible_os_family == "Debian"
+      when: ansible_os_family == "Debian"
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Verify Docker is running
+      shell: docker --version
+      register: docker_version_check
+      changed_when: false
+
+    - name: Show Docker version
+      debug:
+        msg: "Docker version: {{ docker_version_check.stdout }}"
+
+    - name: Disable swap
+      shell: swapoff -a
+      when: ansible_swaptotal_mb > 0
+
+    - name: Remove swap from fstab
+      lineinfile:
+        path: /etc/fstab
+        regexp: '.*swap.*'
+        state: absent
+
+  post_tasks:
+    - name: Verify Docker socket
+      stat:
+        path: /var/run/docker.sock
+      register: docker_socket
+
+    - name: Confirm Docker setup
+      debug:
+        msg: "Docker socket ready: {{ docker_socket.stat.exists }}"
+
+- name: Deploy RKE cluster (run from control machine)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    kubeconfig_path: "{{ playbook_dir }}/../merged-kubeconfig-rke"
+    rke_work_dir: "/tmp/rke-deploy"
+    rke_version: "v1.3.13"
+  
+  pre_tasks:
+    - name: Check RKE nodes are reachable
+      wait_for:
+        host: "{{ hostvars[item].ansible_host }}"
+        port: 22
+        timeout: 30
+      loop: "{{ groups['rke_nodes'] }}"
+      register: ssh_check
+      until: ssh_check is succeeded
+      retries: 3
+      delay: 10
+
+  tasks:
+    - name: Create RKE work directory
+      file:
+        path: "{{ rke_work_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Check if RKE binary exists
+      stat:
+        path: "{{ rke_work_dir }}/rke"
+      register: rke_binary
+
+    - name: Download RKE binary
+      shell: |
+        curl -fsSL -o rke "https://github.com/rancher/rke/releases/download/{{ rke_version }}/rke_linux-amd64"
+        chmod +x rke
+      args:
+        chdir: "{{ rke_work_dir }}"
+      when: not rke_binary.stat.exists
+
+    - name: Generate RKE cluster.yml configuration
+      template:
+        src: cluster.yml.j2
+        dest: "{{ rke_work_dir }}/cluster.yml"
+        mode: '0644'
+
+    - name: Display generated cluster.yml
+      slurp:
+        src: "{{ rke_work_dir }}/cluster.yml"
+      register: cluster_config
+
+    - name: Show cluster configuration
+      debug:
+        msg: "{{ cluster_config.content | b64decode }}"
+
+    - name: Run RKE up
+      shell: |
+        ./rke up --config cluster.yml
+      args:
+        chdir: "{{ rke_work_dir }}"
+      register: rke_result
+      retries: 2
+      delay: 30
+
+    - name: Copy kubeconfig to project root
+      copy:
+        src: "{{ rke_work_dir }}/kube_config_cluster.yml"
+        dest: "{{ kubeconfig_path }}"
+        remote_src: false
+      when: rke_result is succeeded
+
+    - name: Verify kubeconfig was created
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_created
+
+    - name: Test cluster connectivity
+      shell: |
+        export KUBECONFIG={{ kubeconfig_path }}
+        kubectl cluster-info
+        kubectl get nodes
+      register: cluster_test
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Display cluster test results
+      debug:
+        msg: "{{ cluster_test.stdout_lines }}"
+
+  post_tasks:
+    - name: Display cluster status
+      debug:
+        msg: |
+          ========================================
+          RKE Cluster Deployment Complete!
+          ========================================
+          
+          Kubeconfig: {{ kubeconfig_path }}
+          
+          Export kubeconfig:
+          export KUBECONFIG={{ kubeconfig_path }}
+          
+          Verify nodes:
+          kubectl get nodes
+          
+          ========================================
