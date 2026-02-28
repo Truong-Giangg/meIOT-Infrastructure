@@ -12,5 +12,27 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Note: This configuration uses a local `null_resource` (see `eksctl.tf`) to run `eksctl create cluster`.
-# The optional upstream module was removed to avoid provider/module input mismatches in this repository.
+# Local EKS module
+module "eks" {
+  source = "../../modules/eks"
+
+  cluster_name    = var.cluster_name
+  cluster_version = var.cluster_version
+
+  vpc_create = true
+  vpc_name   = "${var.cluster_name}-vpc"
+
+  node_groups = {
+    default = {
+      desired_capacity = var.node_desired_capacity
+      min_capacity     = var.node_min_capacity
+      max_capacity     = var.node_max_capacity
+      instance_type    = var.node_instance_type
+      key_name         = var.key_name
+    }
+  }
+
+  manage_aws_auth = true
+}
+
+# Note: This configuration also includes an eksctl-based fallback in eksctl.tf
