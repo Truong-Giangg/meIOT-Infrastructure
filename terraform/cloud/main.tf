@@ -19,9 +19,6 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
 
-  vpc_create = true
-  vpc_name   = "${var.cluster_name}-vpc"
-
   node_groups = {
     default = {
       desired_capacity = var.node_desired_capacity
@@ -31,8 +28,6 @@ module "eks" {
       key_name         = var.key_name
     }
   }
-
-  manage_aws_auth = true
 }
 
 # Note: This configuration also includes an eksctl-based fallback in eksctl.tf
