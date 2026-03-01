@@ -15,8 +15,12 @@ module "upstream" {
   version = "~> 21.0"
 
   # Note: The upstream module uses "name" not "cluster_name"
-  name    = var.cluster_name
-  version = var.cluster_version
+  name                = var.cluster_name
+  kubernetes_version  = var.cluster_version
+
+  vpc_id              = var.vpc_id
+  subnet_ids          = var.subnet_ids
+  control_plane_subnet_ids = var.subnet_ids
 
   # Node groups - simplified for free tier
   eks_managed_node_groups = {
@@ -32,13 +36,6 @@ module "upstream" {
       }
     )
   }
-
-  # VPC configuration
-  create_vpc = var.vpc_create
-  vpc_name   = var.vpc_name
-  
-  # Optional auth management
-  manage_aws_auth_configmap = var.manage_aws_auth
 
   tags = var.tags
 }

@@ -153,6 +153,130 @@ kubectl get pod -n ingress-nginx
 kubectl get storageclass
 ```
 
+## Quick Start: Deploy AWS EKS Cluster
+
+### What Gets Deployed
+
+This Terraform configuration automates all steps needed for a production-ready EKS cluster:
+
+1. ✅ **VPC & Subnets** — Creates VPC, public subnets (for load balancers), private subnets (for nodes), NAT gateways, and route tables
+2. ✅ **IAM Roles** — Automatically creates and configures IAM roles for the EKS cluster and worker nodes
+3. ✅ **EKS Control Plane** — Provisions the managed EKS control plane (the "brain")
+4. ✅ **Node Groups** — Provisions EC2 instances as worker nodes (the "body"), with auto-scaling
+5. ✅ **kubectl Configuration** — Outputs commands to configure kubectl to talk to your cluster
+
+### Prerequisites
+
+- AWS account with appropriate IAM permissions
+- Terraform installed locally
+- AWS credentials configured (`aws configure` or environment variables)
+- `kubectl` and `aws-cli` tools installed
+
+### Step 1: Deploy EKS Cluster and VPC via Terraform
+
+```bash
+cd terraform/cloud
+
+# Initialize Terraform
+terraform init
+
+# Plan the deployment (review VPC, subnets, EKS cluster resources)
+terraform plan \
+  -var="cluster_name=meiot-eks" \
+  -var="cluster_version=1.28" \
+  -var="vpc_cidr=10.0.0.0/16" \
+  -var="single_nat_gateway=true" \
+  -out=tfplan
+
+# Apply the plan to create resources in AWS
+terraform apply tfplan
+```
+
+**What it does:**
+- Creates VPC with public & private subnets across 3 availability zones
+- Configures NAT Gateway for private subnet egress
+- Provisions EKS control plane and managed node group
+- Sets up all networking, IAM roles, and security groups
+
+**Output:**
+```bash
+# Get cluster information
+terraform output cluster_name
+terraform output cluster_endpoint
+terraform output cluster_id
+```
+
+### Step 2: Configure kubectl to Talk to Your Cluster
+
+```bash
+# Use the Terraform output command to get the kubectl configuration command
+terraform output kubectl_config_command
+
+# Or manually run:
+aws eks update-kubeconfig \
+  --region us-east-1 \
+  --name meiot-eks
+
+# Verify kubectl can communicate with the cluster
+kubectl cluster-info
+kubectl get nodes
+```
+
+**Variables you can customize:**
+- `vpc_cidr` — VPC CIDR block (default: `10.0.0.0/16`)
+- `private_subnet_cidrs` — Private subnet ranges (default: `10.0.1.0/24`, `10.0.2.0/24`, `10.0.3.0/24`)
+- `public_subnet_cidrs` — Public subnet ranges (default: `10.0.101.0/24`, `10.0.102.0/24`, `10.0.103.0/24`)
+- `single_nat_gateway` — Use one NAT Gateway for all subnets (default: `true`, cost-effective)
+- `node_instance_type` — EC2 instance type for nodes (default: `t3.micro`, free-tier eligible)
+- `node_desired_capacity` — Number of worker nodes (default: `1`)
+- `cluster_version` — Kubernetes version (default: `1.28`)
+
+### Step 3: Verify EKS Cluster
+- `vpc_cidr` — VPC CIDR block (default: `10.0.0.0/16`)
+- `private_subnet_cidrs` — Private subnet ranges (default: `10.0.1.0/24`, `10.0.2.0/24`, `10.0.3.0/24`)
+- `public_subnet_cidrs` — Public subnet ranges (default: `10.0.101.0/24`, `10.0.102.0/24`, `10.0.103.0/24`)
+- `single_nat_gateway` — Use one NAT Gateway for all subnets (default: `true`, cost-effective)
+- `node_instance_type` — EC2 instance type for nodes (default: `t3.micro`, free-tier eligible)
+- `node_desired_capacity` — Number of worker nodes (default: `1`)
+
+### Step 3: Verify EKS Cluster
+
+```bash
+# Check cluster nodes
+kubectl get nodes -o wide
+
+# Check node readiness
+kubectl get nodes
+
+# View cluster info
+kubectl cluster-info
+
+# Check default storage class
+kubectl get storageclass
+```
+
+### Step 4: (Optional) Deploy Applications
+
+Once the cluster is running, you can deploy applications using Helm charts from `helm/` or Kubernetes manifests from `manifests/`.
+
+```bash
+# Example: Deploy a sample app
+kubectl apply -f manifests/example-deployment.yaml
+```
+
+### Step 5: Cleanup: Destroy EKS Cluster
+
+```bash
+# Remove all Kubernetes resources first
+kubectl delete --all deployments
+kubectl delete --all services
+kubectl delete --all pvc
+
+# Then destroy Terraform resources
+cd terraform/cloud
+terraform destroy
+```
+
 ## Next Steps
 
 - Deploy sample microservices using Helm charts in `helm/`
